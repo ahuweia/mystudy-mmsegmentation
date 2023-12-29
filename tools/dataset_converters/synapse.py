@@ -76,10 +76,10 @@ def main():
                                 'Please check your dataset.')
 
     train_id = read_files_from_txt(osp.join(dataset_path, 'train.txt'))
-    train_id = [idx[3:7] for idx in train_id]
+    train_id = [idx for idx in train_id]
 
     test_id = read_files_from_txt(osp.join(dataset_path, 'val.txt'))
-    test_id = [idx[3:7] for idx in test_id]
+    test_id = [idx for idx in test_id]
 
     mkdir_or_exist(osp.join(save_path, 'img_dir/train'))
     mkdir_or_exist(osp.join(save_path, 'img_dir/val'))
@@ -88,11 +88,43 @@ def main():
 
     # It follows data preparation pipeline from here:
     # https://github.com/Beckschen/TransUNet/tree/main/datasets
-    for i, idx in enumerate(train_id):
+    for i, filename in enumerate(train_id):
         img_3d = read_nii_file(
-            osp.join(dataset_path, 'img', 'img' + idx + '.nii.gz'))
+            osp.join(dataset_path, 'img', filename))
         label_3d = read_nii_file(
-            osp.join(dataset_path, 'label', 'label' + idx + '.nii.gz'))
+            osp.join(dataset_path, 'label', filename[:14] + "_seg" + filename[14:]))
+
+        img_3d = np.clip(img_3d, -125, 275)
+        img_3d = (img_3d + 125) / 400
+        img_3d *= 255
+        img_3d = np.transpose(img_3d, [2, 0, 1])
+        img_3d = np.flip(img_3d, 2)
+
+        label_3d = np.transpose(label_3d, [2, 0, 1])
+        label_3d = np.flip(label_3d, 2)
+
+        label_3d = label_mapping(label_3d)
+
+        for c in range(img_3d.shape[0]):
+            img = img_3d[c]
+            label = label_3d[c]
+
+            img = Image.fromarray(img).convert('RGB')
+            label = Image.fromarray(label).convert('L')
+            img.save(
+                osp.join(
+                    save_path, 'img_dir/train', filename[:10] +
+                                                '_slice' + str(c).zfill(3) + '.png'))
+            label.save(
+                osp.join(
+                    save_path, 'ann_dir/train', filename[:10] +
+                                                '_slice' + str(c).zfill(3) + '.png'))
+
+    for i, filename in enumerate(test_id):
+        img_3d = read_nii_file(
+            osp.join(dataset_path, 'img', filename))
+        label_3d = read_nii_file(
+            osp.join(dataset_path, 'label', filename[:14] + "_seg" + filename[14:]))
 
         img_3d = np.clip(img_3d, -125, 275)
         img_3d = (img_3d + 125) / 400
@@ -112,43 +144,12 @@ def main():
             label = Image.fromarray(label).convert('L')
             img.save(
                 osp.join(
-                    save_path, 'img_dir/train', 'case' + idx.zfill(4) +
-                    '_slice' + str(c).zfill(3) + '.jpg'))
+                    save_path, 'img_dir/val', filename[:10] +
+                                              '_slice' + str(c).zfill(3) + '.png'))
             label.save(
                 osp.join(
-                    save_path, 'ann_dir/train', 'case' + idx.zfill(4) +
-                    '_slice' + str(c).zfill(3) + '.png'))
-
-    for i, idx in enumerate(test_id):
-        img_3d = read_nii_file(
-            osp.join(dataset_path, 'img', 'img' + idx + '.nii.gz'))
-        label_3d = read_nii_file(
-            osp.join(dataset_path, 'label', 'label' + idx + '.nii.gz'))
-
-        img_3d = np.clip(img_3d, -125, 275)
-        img_3d = (img_3d + 125) / 400
-        img_3d *= 255
-        img_3d = np.transpose(img_3d, [2, 0, 1])
-        img_3d = np.flip(img_3d, 2)
-
-        label_3d = np.transpose(label_3d, [2, 0, 1])
-        label_3d = np.flip(label_3d, 2)
-        label_3d = label_mapping(label_3d)
-
-        for c in range(img_3d.shape[0]):
-            img = img_3d[c]
-            label = label_3d[c]
-
-            img = Image.fromarray(img).convert('RGB')
-            label = Image.fromarray(label).convert('L')
-            img.save(
-                osp.join(
-                    save_path, 'img_dir/val', 'case' + idx.zfill(4) +
-                    '_slice' + str(c).zfill(3) + '.jpg'))
-            label.save(
-                osp.join(
-                    save_path, 'ann_dir/val', 'case' + idx.zfill(4) +
-                    '_slice' + str(c).zfill(3) + '.png'))
+                    save_path, 'ann_dir/val', filename[:10] +
+                                              '_slice' + str(c).zfill(3) + '.png'))
 
 
 if __name__ == '__main__':
